@@ -65,5 +65,8 @@ Open your browser and navigate to: **http://127.0.0.1:7860**
 - **Framework**: [Gradio](https://gradio.app/)
 - **Libraries**: Hugging Face Transformers, PyTorch, PIL.
 
+## 📜 License
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
 ---
 Developed by [metalmancode](https://github.com/metalmancode)
