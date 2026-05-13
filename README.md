@@ -1,12 +1,12 @@
 # BlipVision Studio 🖼️
 
-An enhanced image captioning application powered by the Salesforce BLIP model and Gradio.
+An advanced image analysis and SEO tool powered by the Salesforce **BLIP-Large** model and Gradio.
 
 ## Features
-- **AI-Powered Captioning**: Uses the BLIP (Bootstrapping Language-Image Pre-training) model for high-quality image descriptions.
-- **Hardware Acceleration**: Automatically detects and utilizes GPU (CUDA) or Apple Silicon (MPS) for faster processing.
-- **Conditional Prompts**: Guide the AI with custom prompts to focus on specific details.
-- **Modern UI**: Clean and responsive interface built with Gradio Blocks.
+- **Pro Image Analysis**: Uses the larger, more sophisticated BLIP model for high-detail, descriptive captions.
+- **SEO Keyword Suggestions**: Automatically generates a list of relevant keywords to optimize your images for search engines.
+- **Hardware Acceleration**: Automatically detects and utilizes GPU (CUDA) or Apple Silicon (MPS).
+- **Custom Focus**: Guide the AI with optional prompts to describe specific aspects of the image.
 
 ## Installation
 1. Clone the repository:

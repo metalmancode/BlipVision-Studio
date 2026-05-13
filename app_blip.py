@@ -9,60 +9,69 @@ device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is
 
 print(f"Loading model on {device}...")
 
-# Load the processor and model
-processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base").to(device)
+# Load the processor and model (Upgraded to LARGE for better details)
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
+model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large").to(device)
 
-def generate_caption(image: Image.Image, text_prompt: str) -> str:
+def analyze_image(image: Image.Image, text_prompt: str):
     """
-    Generates a caption for the provided image.
+    Generates a detailed caption and SEO keywords for the provided image.
     """
     try:
         if image is None:
-            return "Please upload an image first."
+            return "Please upload an image first.", ""
             
-        # 2. ENHANCEMENT: Conditional Captioning
-        # BLIP can take an optional prompt to guide the caption generation
-        if text_prompt.strip():
-            inputs = processor(images=image, text=text_prompt, return_tensors="pt").to(device)
-        else:
-            inputs = processor(images=image, return_tensors="pt").to(device)
-            
-        # 3. ENHANCEMENT: Better generation parameters
-        # max_new_tokens ensures the generated caption isn't cut off early
-        outputs = model.generate(**inputs, max_new_tokens=50)
+        # --- 1. DETAILED CAPTION ---
+        # We use beam search and a minimum length to ensure details
+        inputs_caption = processor(images=image, text=text_prompt if text_prompt.strip() else None, return_tensors="pt").to(device)
+        outputs_caption = model.generate(
+            **inputs_caption, 
+            max_new_tokens=100, 
+            min_length=30, 
+            num_beams=5,
+            repetition_penalty=1.5
+        )
+        detailed_caption = processor.decode(outputs_caption[0], skip_special_tokens=True)
         
-        caption = processor.decode(outputs[0], skip_special_tokens=True)
-        return caption
+        # --- 2. SEO KEYWORDS ---
+        # We prompt the model specifically for tags/keywords
+        prompt_keywords = "a list of seo keywords for this image:"
+        inputs_kw = processor(images=image, text=prompt_keywords, return_tensors="pt").to(device)
+        outputs_kw = model.generate(**inputs_kw, max_new_tokens=50)
+        keywords_raw = processor.decode(outputs_kw[0], skip_special_tokens=True)
+        
+        # Clean up keywords (remove the prompt from the result)
+        keywords = keywords_raw.replace(prompt_keywords, "").strip()
+        
+        return detailed_caption, keywords
+        
     except Exception as e:
-        return f"An error occurred: {str(e)}"
+        return f"An error occurred: {str(e)}", ""
 
 # 4. ENHANCEMENT: Modern UI with gr.Blocks
-# gr.Blocks provides a more flexible and customizable layout than gr.Interface
-with gr.Blocks(title="Enhanced Image Captioning") as app:
-    gr.Markdown("# 🖼️ AI Image Captioning with BLIP")
-    gr.Markdown("Upload an image to automatically generate a descriptive caption using the Salesforce BLIP model.")
+with gr.Blocks(title="BlipVision Studio") as app:
+    gr.Markdown("# 🖼️ BlipVision Studio: Pro Image Analyzer")
+    gr.Markdown("Upload an image to get high-detail descriptions and optimized SEO keywords.")
     
     with gr.Row():
         with gr.Column(scale=1):
             input_image = gr.Image(type="pil", label="Upload Image")
-            # Optional prompt to guide the model
             text_prompt = gr.Textbox(
-                label="Optional Starting Prompt", 
-                placeholder="e.g., 'A picture of a...'"
+                label="Custom Focus (Optional)", 
+                placeholder="e.g., 'focus on the colors' or 'describe the background'"
             )
-            submit_btn = gr.Button("Generate Caption", variant="primary")
+            submit_btn = gr.Button("Analyze Image", variant="primary")
             
         with gr.Column(scale=1):
-            output_caption = gr.Textbox(label="Generated Caption", lines=6)
+            output_caption = gr.Textbox(label="Detailed Explanation", lines=5)
+            output_keywords = gr.Textbox(label="SEO Keyword Suggestions", lines=3)
             
-    # Link the UI elements to the python function
+    # Link the UI elements
     submit_btn.click(
-        fn=generate_caption,
+        fn=analyze_image,
         inputs=[input_image, text_prompt],
-        outputs=output_caption
+        outputs=[output_caption, output_keywords]
     )
 
 if __name__ == "__main__":
-    # Launch the application
     app.launch(server_name="127.0.0.1", server_port=7860)
