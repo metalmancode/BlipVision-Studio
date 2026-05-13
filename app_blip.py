@@ -2,6 +2,7 @@ import gradio as gr
 import torch
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from PIL import Image
+import re
 
 # 1. ENHANCEMENT: Hardware Acceleration
 # Automatically use GPU (CUDA) if available, Apple Silicon (MPS) if on Mac, or fallback to CPU
@@ -55,44 +56,67 @@ def analyze_image(image: Image.Image, text_prompt: str):
             detailed_caption = processor.decode(outputs_caption[0], skip_special_tokens=True)
         
         # --- 2. SEO KEYWORDS ---
-        # A more descriptive prompt for professional tags
-        kw_prompt = "keywords for a professional social media post about this image:"
+        # A more sophisticated prompt to steer the AI toward professional/business terminology
+        kw_prompt = "A professional list of business and technology SEO keywords for this image:"
         inputs_kw = processor(images=image, text=kw_prompt, return_tensors="pt").to(device)
         outputs_kw = model.generate(
             **inputs_kw, 
             max_new_tokens=60,
             do_sample=True,
-            top_k=50,
-            temperature=0.9,
-            repetition_penalty=1.2
+            top_p=0.9,
+            temperature=0.8,
+            repetition_penalty=1.5
         )
         keywords_raw = processor.decode(outputs_kw[0], skip_special_tokens=True)
         
-        # Clean up prompt prefix
-        keywords_raw = keywords_raw.replace(kw_prompt, "").strip()
+        # Clean up prompt prefix (handle case-insensitive and partial matches)
+        keywords_raw = re.sub(re.escape(kw_prompt), '', keywords_raw, flags=re.IGNORECASE).strip()
         
         # --- 3. FORMAT AS HASHTAGS ---
-        # Stopwords to filter out for better SEO
-        STOPWORDS = {"tags", "are", "not", "tool", "to", "describe", "a", "the", "in", "on", "at", "with", "is", "for", "of", "and", "or", "as", "this", "that", "it", "my", "your", "be"}
+        # Stopwords and low-value words
+        EXCLUDE = {
+            "tags", "keywords", "professional", "social", "media", "post", "about", "image",
+            "are", "not", "tool", "to", "describe", "a", "the", "in", "on", "at", "with", 
+            "is", "for", "of", "and", "or", "as", "this", "that", "it", "my", "your", "be",
+            "list", "photo", "photography", "picture", "sits", "sitting", "leaning", "holding"
+        }
         
-        import re
         # Split by commas, spaces, and punctuation
         words = re.split(r'[,\s\.\!\?\:\;]+', keywords_raw)
         
-        # Filter: lowercase, length > 2, and not a stopword
         clean_words = []
         seen = set()
         for w in words:
             w_clean = w.lower().strip()
-            if len(w_clean) > 2 and w_clean not in STOPWORDS and w_clean not in seen:
+            if len(w_clean) > 3 and w_clean not in EXCLUDE and w_clean not in seen:
                 clean_words.append(f"#{w_clean}")
                 seen.add(w_clean)
         
-        hashtags = " ".join(clean_words)
+        # --- 4. THEME BOOSTER (Professional SEO Logic) ---
+        # If the AI detects certain objects, we add professional industry tags
+        caption_lower = detailed_caption.lower()
+        theme_tags = []
         
-        # Fallback if it failed to generate good tags
+        if any(x in caption_lower for x in ["data", "matters", "monitor", "computer", "desk"]):
+            theme_tags.extend(["#dataanalytics", "#fintech", "#digitaltransformation", "#businessintelligence", "#technews"])
+        if any(x in caption_lower for x in ["man", "office", "work", "sitting"]):
+            theme_tags.extend(["#productivity", "#workfromhome", "#entrepreneur", "#leadership"])
+            
+        # Add a few general high-value SEO tags if the list is short
+        if len(clean_words) < 5:
+            theme_tags.extend(["#innovation", "#ai", "#technology"])
+            
+        # Combine and deduplicate
+        final_tags = []
+        for tag in clean_words + theme_tags:
+            if tag not in final_tags:
+                final_tags.append(tag)
+                
+        hashtags = " ".join(final_tags[:15]) # Limit to top 15 for best SEO
+        
+        # Fallback
         if not hashtags:
-            hashtags = "#data #business #technology #workspace #office"
+            hashtags = "#data #business #technology #workspace #innovation"
         
         return detailed_caption, hashtags
         
